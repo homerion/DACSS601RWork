@@ -1,0 +1,33 @@
+---
+title: "Homework 4"
+output: pdf_document
+---
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r data import}
+raw_stx <- read.delim("game_data_public.STX.Sealed.csv",header = TRUE,sep = ",")
+```
+## 17lands.com Mulligans
+
+In a Magic the Gathering game both players draw 7 cards and then decide if they want to mulligan.  This means shuffling their current cards away and drawing one fewer.  A player can mulligan as many times as they like.   For this visualization I wanted to establish some kind of relationship between the mulliganing decisions of players and both their experience level and win rates.  My first instinct was to code players into categories based on a combination of their experience level and win rate, then to look at how those different categories mulliganed.  This is the visualization I went with but not after some iterations.
+
+```{r plot}
+raw_stx %>% 
+  select("user_win_rate_bucket","user_n_games_bucket","num_mulligans") %>% 
+  mutate(experience_plus_skill = case_when(
+    user_win_rate_bucket > .54 & user_n_games_bucket < 50 ~ "Inexperienced Above Average",
+    user_win_rate_bucket > .54 & user_n_games_bucket >= 50 ~ "Experienced Above Average",
+    user_win_rate_bucket <= .54 & user_n_games_bucket < 50 ~ "Inexperienced Below Average",
+    user_win_rate_bucket <= .54 & user_n_games_bucket >= 50 ~ "Experienced Below Average",
+    TRUE ~ "Not Available")
+           ) %>%
+  ggplot(aes(experience_plus_skill, fill = factor(num_mulligans))) + geom_bar() +
+  theme_bw()
+```
+
+
+I really like the additional information conveyed by the filled bar charts and so looked at variations.  Specifically I tried graphing the number of mulligans and filling with whether the player won or lost.  That yeilded a chart with effectively two bars that were both more or less bisected, which meant overall mulliganing did not seem to have much of an inpact on winning a game.  I also tried graphing player win rates and filling it in with how many mulligans were taken.  That graph does look like mulligans skew toward lower win rates, but again there are so few mulligans that it is not a great visual tool.  So I decided that my first visualization was the best.  When first looking at the above chart I initially did think it looked like while small inexperienced players mulligan more, until I realized that proportionately this chart suggests they are the same.  Upon looking at it again I do think this chart does say something interesting, which is that among experienced players those who are below average proportionately mulligan much more.  I do wish I had someway of showing these not as a count but a proportion.

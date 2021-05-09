@@ -1,0 +1,92 @@
+---
+title: "Homework 5"
+output: pdf_document
+---
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r data import}
+raw_stx <- read.delim("game_data_public.STX.Sealed.csv",header = TRUE,sep = ",")
+```
+```{r card advantage calculations}
+stx <- raw_stx %>%
+  rowwise() %>% 
+  mutate(drawn=ifelse(on_play,
+         sum(c_across(360:702))- num_turns+1,
+          sum(c_across(360:702))- num_turns),
+         won_int= ifelse(won,1,0))
+theory <- stx %>%
+  select("won_int","drawn") %>%
+  group_by(drawn) %>%
+  summarize(win_rate = mean(won_int, na.rm = TRUE))
+theory_count <- stx %>%
+  select("won_int","drawn") %>%
+  group_by(drawn) %>% 
+  tally()
+theory_sliced <- stx %>%
+  select("won_int","drawn") %>%
+  group_by(drawn) %>%
+  summarize(win_rate = mean(won_int, na.rm = TRUE)) %>% 
+  slice(4:24)
+```
+
+
+##17lands Card Advantage
+
+In Magic the Gathering the concept of card advantage is one of the earliest theories of how to win games.  In its simplest form it says that the player who has drawn more cards is more likely to win the game.  This data set does not have information about or a way to deduce the number of cards a 17lands user's opponent drew.  Therefore we cannot explicitly test this theory.  However the theory of card advantage does imply that the more cards you draw the more likely you are to win, so seeing if there is a relationship between win rate and the number of cards drawn is the next best thing.  This dataset consists of `r ncol(raw_stx)` variables.  There are 343 unique cards that players can have in their decks.  The first 17 variables are dedicated to keeping track of the player and game overall.  In the dataset are 343 consecutive columns each describing how many of that particular card they drew over the course of the game.  So my first step was to mutate a column that was the sum of those columns.  However in games of Magic, unless it is the first turn of the first player to go, you draw a card each turn.  So I subtracted how many turns it had been from that sum, plus one if they went first, so as to not be influenced by how many turns the games had gone.  This is sound under card advantage theory because it's about the relative number of cards drawn and both players draw as the game goes on.  In the same mutate I also had to recode the column tracking if the player won.  It was originally made up of boolean values, but converting them to 0's and 1's meant taking their mean would give me the win rate and I no longer had to deal with error messages. 
+
+```{r original dataset}
+raw_stx %>% 
+  select("num_turns","won",360:361) %>% 
+  slice(1:6) %>% 
+  kable(align = 'c',caption="The Shape of the Original Dataset")
+```
+
+```{r new dataset}
+stx %>% 
+  select("num_turns","won","won_int","drawn") %>% 
+  head() %>% 
+  kable(align = 'c',caption="The Shape of the New Dataset")
+```
+Next I want to share the table of how many players drew how many cards.
+```{r theory count table }
+stx %>%
+  select("won_int","drawn") %>%
+  group_by(drawn) %>% 
+  tally() %>% 
+  kable(align = 'c',caption="Tally of Cards Drawn")
+```
+```{r percentage of outliers}
+outliers <- theory_count %>%
+  slice(25:32) %>%
+  select("n") %>% 
+  colSums()
+```
+From this we can see that there are some nonsensical negative values, which I currently do no understand, but there are few enough that I will ignore them.  Also there are so few data points for players who have drawn more than 20 extra cards that I want to also ignore them.  They only make up `r outliers[[1]]/nrow(stx)*100`% of all games recorded.  I feel this graph also helps put in perspective how few data points these are to help justify this.  I will show analysis with and without these data points.
+```{r plot cards drawn}
+ggplot(stx,aes(drawn)) + geom_bar()
+```
+
+So now I can group by cards drawn and associate a win rate to each value.  With those outliers there is a correlation of `r cor(theory$win_rate,theory$drawn)`, but without them there is a correlation of `r cor(theory_sliced$win_rate,theory_sliced$drawn)`.  Moreover when we do linear regression of the data without outliers we get:
+
+```{r summary of theory sliced}
+summary(lm(theory_sliced$drawn~theory_sliced$win_rate))
+```
+```{r plot of theory sliced}
+ggplot(theory_sliced,aes(drawn,win_rate)) + geom_point() + 
+    stat_smooth(method = "lm", col = "blue")
+```
+
+We get a fantastic p value and a pretty compelling graph that indeed drawing more cards is associated with winning more often.  Admittedly if we include the outliers we get significantly worse results.
+```{r summary of theory unsliced}
+summary(lm(theory$drawn~theory$win_rate))
+```
+```{r plot of theory unsliced}
+ggplot(theory,aes(drawn,win_rate)) + geom_point() + 
+  stat_smooth(method = "lm", col = "blue")
+```
+With the outliers included it would seem that you can draw too many cards.  Perhaps there are diminishing returns and this model should be a parabola.

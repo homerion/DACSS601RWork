@@ -1,0 +1,21 @@
+---
+title: "Homework 2"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r data import}
+scdb <- read.delim("scdb.csv",header = TRUE,sep = ",")
+```
+```{r unanimous votes}
+unanimous <- filter(scdb,minVotes==0) %>% 
+  nrow()
+```
+
+
+## Supreme Court Database
+
+The Supreme Court database consists of `r nrow(scdb)` cases.  It uses `r ncol(scdb)` variables to describe each case.  There have been `r unanimous` unanimous decisions, which constitutes approximately `r (100 * unanimous)%/%nrow(scdb)`% of all their cases.
